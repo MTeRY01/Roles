@@ -1,0 +1,15 @@
+---
+- name: Include common tasks
+  ansible.builtin.include_tasks: common.yml
+
+- name: Include Ansible installation tasks
+  ansible.builtin.include_tasks: ansible.yml
+  when: "'ansible' in install_packages"
+
+- name: Include Terraform installation tasks
+  ansible.builtin.include_tasks: terraform.yml
+  when: "'terraform' in install_packages"
+
+- name: Include Docker installation tasks
+  ansible.builtin.include_tasks: docker.yml
+  when: "'docker' in install_packages"

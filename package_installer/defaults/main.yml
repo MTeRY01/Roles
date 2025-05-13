@@ -1,0 +1,21 @@
+---
+# Default packages to install (empty by default)
+install_packages: []
+
+# Common settings
+system_packages:
+  - software-properties-common
+  - gnupg
+  - curl
+  - python3-pip
+
+# Package-specific versions
+package_versions:
+  ansible: ""
+  terraform: ""
+  docker: ""
+
+# User management
+manage_user: true
+user_name: "{{ ansible_user }}"
+user_groups: []

@@ -1,0 +1,23 @@
+---
+- name: Add Ansible PPA
+  ansible.builtin.apt_repository:
+    repo: ppa:ansible/ansible
+    state: present
+  when: "'ansible' in install_packages"
+
+- name: Install Ansible
+  ansible.builtin.apt:
+    name: "ansible{% if package_versions.ansible %}={{
+      package_versions.ansible }}{% endif %}"
+    state: present
+  when: "'ansible' in install_packages"
+
+- name: Verify Ansible version
+  ansible.builtin.command: ansible --version
+  ansible.builtin.register: ansible_version
+  when: "'ansible' in install_packages"
+
+- name: Show Ansible version
+  ansible.builtin.debug:
+    msg: "{{ ansible_version.stdout_lines }}"
+  when: "'ansible' in install_packages"

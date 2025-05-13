@@ -1,0 +1,13 @@
+---
+- name: Restart Docker
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+    enabled: yes
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: Update environment
+  ansible.builtin.command: update-environment

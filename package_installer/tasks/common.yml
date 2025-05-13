@@ -1,0 +1,11 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+  notify: Reload systemd
+
+- name: Install common dependencies
+  ansible.builtin.apt:
+    name: "{{ system_packages }}"
+    state: present
+  tags: always

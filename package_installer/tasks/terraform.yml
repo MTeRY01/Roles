@@ -1,0 +1,33 @@
+---
+- name: Add HashiCorp GPG key
+  ansible.builtin.shell: |
+    curl -fsSL https://apt.releases.hashicorp.com/gpg | \
+    gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+  args:
+    creates: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+  when: "'terraform' in install_packages"
+
+- name: Add HashiCorp APT repository
+  ansible.builtin.copy:
+    content: |
+      deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
+      https://apt.releases.hashicorp.com {{ ansible_distribution_release | lower }} main
+    dest: /etc/apt/sources.list.d/hashicorp.list
+  when: "'terraform' in install_packages"
+
+- name: Install Terraform
+  ansible.builtin.apt:
+    name: "terraform{% if package_versions.terraform %}={{
+      package_versions.terraform }}{% endif %}"
+    state: present
+  when: "'terraform' in install_packages"
+
+- name: Verify Terraform version
+  ansible.builtin.command: terraform -version
+  ansible.builtin.register: terraform_version
+  when: "'terraform' in install_packages"
+
+- name: Show Terraform version
+  ansible.builtin.debug:
+    msg: "{{ terraform_version.stdout_lines }}"
+  when: "'terraform' in install_packages"
