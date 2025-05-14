@@ -1,0 +1,14 @@
+- name: Build and Push Docker Image
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  roles:
+    - role: docker_builder
+      vars:
+        project_root: "../api"
+        image_repo: "sda_group5/api"
+        image_tag: "v1.0.0"
+        docker_registry: "docker.io"
+        push_retries: 3
+        push_retry_delay: 5

@@ -1,0 +1,20 @@
+- name: Set up complete development environment
+  hosts: jump_host
+  become: yes
+  roles:
+    - role: ../package_installer
+      vars:
+        install_packages:
+          - ansible
+          - terraform
+          - docker
+        # package_versions:
+        #   ansible: "2.14.0"
+        #   terraform: "1.5.7"
+        system_packages:
+          - software-properties-common
+          - gnupg
+          - curl
+          - python3-pip
+          - git
+          - unzip
