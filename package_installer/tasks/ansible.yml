@@ -1,23 +1,36 @@
 ---
+- name: Check if Ansible is installed
+  command: ansible --version
+  register: ansible_check
+  changed_when: false
+  failed_when: false
+
 - name: Add Ansible PPA
-  ansible.builtin.apt_repository:
+  apt_repository:
     repo: ppa:ansible/ansible
     state: present
-  when: "'ansible' in install_packages"
+  when: "'ansible' in install_packages and ansible_check.rc != 0"
 
-- name: Install Ansible
-  ansible.builtin.apt:
-    name: "ansible{% if package_versions.ansible %}={{
-      package_versions.ansible }}{% endif %}"
+- name: Install Ansible (latest)
+  apt:
+    name: ansible
     state: present
-  when: "'ansible' in install_packages"
+  when: "'ansible' in install_packages and ansible_check.rc != 0"
 
 - name: Verify Ansible version
-  ansible.builtin.command: ansible --version
-  ansible.builtin.register: ansible_version
+  command: ansible --version
+  register: ansible_version
   when: "'ansible' in install_packages"
 
 - name: Show Ansible version
-  ansible.builtin.debug:
-    msg: "{{ ansible_version.stdout_lines }}"
+  debug:
+    msg: |
+      Ansible Installation Report:
+      {{ ansible_version.stdout | default('Version check failed') }}
+      
+      Raw output:
+      {{ ansible_version }}
   when: "'ansible' in install_packages"
+
+
+#pass test

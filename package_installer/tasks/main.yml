@@ -13,3 +13,7 @@
 - name: Include Docker installation tasks
   ansible.builtin.include_tasks: docker.yml
   when: "'docker' in install_packages"
+
+# Note: The order of the tasks is important. The tasks in the included files
+
+#pass test

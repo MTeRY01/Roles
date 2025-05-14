@@ -5,9 +5,17 @@
     state: restarted
     enabled: yes
 
+- name: Ensure Docker service is started 
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: yes
+
 - name: Reload systemd
   ansible.builtin.systemd:
     daemon_reload: yes
 
 - name: Update environment
   ansible.builtin.command: update-environment
+
+  #pass test 

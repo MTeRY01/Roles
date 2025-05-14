@@ -1,15 +1,143 @@
-- name: Add Docker apt repository
+---
+# This file is roles/package_installer/tasks/docker.yml
+# It is a list of tasks for installing Docker.
+# 'become: true' is expected to be set by the calling play/role.
+
+- name: Check if Docker is installed
+  ansible.builtin.command: docker --version
+  register: docker_check
+  changed_when: false
+  ignore_errors: true # Important: task should not fail if docker is not installed
+
+# Tasks to install Docker if it's not already present (docker_check.rc != 0)
+
+- name: Install prerequisite packages for GPG key management and HTTPS repos
+  ansible.builtin.apt:
+    name:
+      - gpg
+      - apt-transport-https
+      - ca-certificates
+    state: present
+  when: docker_check.rc != 0
+
+- name: Create Docker keyring directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755' # drwxr-xr-x
+  when: docker_check.rc != 0
+
+- name: Download Docker's official GPG key (ASCII-armored)
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc # Temporary location for the ASCII key
+    mode: '0644' # -rw-r--r--
+    force: true # Ensures the key is always downloaded to catch updates
+  register: download_gpg_key
+  when: docker_check.rc != 0
+
+- name: Remove existing de-armored GPG key if the downloaded ASCII key changed
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/docker.gpg
+    state: absent
+  when:
+    - docker_check.rc != 0
+    - download_gpg_key.changed # Only if the .asc key was newly downloaded or its content changed
+
+- name: De-armor Docker's GPG key (convert .asc to .gpg)
+  ansible.builtin.command:
+    # Use --batch and --yes to avoid prompts, -o for output file
+    cmd: gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg /etc/apt/keyrings/docker.asc
+  args:
+    # This command creates docker.gpg. If docker.gpg already exists (and wasn't removed by previous task),
+    # gpg will overwrite it. 'creates' is an additional guard for idempotency.
+    creates: /etc/apt/keyrings/docker.gpg
+  register: gpg_dearmor_result
+  # Mark as changed if the command ran successfully and we are not in check mode,
+  # especially if the .asc key was updated.
+  changed_when: "gpg_dearmor_result.rc == 0 and (download_gpg_key.changed or not ansible_check_mode)"
+  when: docker_check.rc != 0
+
+- name: Ensure correct permissions and ownership for the de-armored Docker GPG key
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/docker.gpg
+    mode: '0644' # -rw-r--r--
+    owner: root
+    group: root
+  when: docker_check.rc != 0
+
+- name: Remove temporary ASCII-armored GPG key file
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/docker.asc
+    state: absent
+  when: docker_check.rc != 0 # Only remove if we actually went through the download process
+
+- name: Add Docker APT repository
   ansible.builtin.apt_repository:
+    # Using 'amd64' directly. For other architectures, this would need adjustment.
+    # Using '{{ ansible_distribution_release | lower }}' for the release codename.
     repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release | lower }} stable"
     state: present
-    filename: docker
-  notify: Restart Docker  # ← Triggers handler at end of playbook
+    filename: docker # Creates /etc/apt/sources.list.d/docker.list
+    update_cache: true # Update cache after adding the repo
+    validate_certs: true # Recommended for security
+  when: docker_check.rc != 0
 
-- name: Add user to docker group
+- name: Install Docker packages
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+  when: docker_check.rc != 0
+  notify: # Example: If you have a handler named "Ensure Docker service is started"
+    - Ensure Docker service is started
+
+# Tasks that should run regardless of whether Docker was newly installed or already present
+# (e.g., ensure service is running, add user to group)
+
+- name: Ensure Docker service is started and enabled on boot
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  # This task should run even if Docker was already installed to ensure it's running.
+
+- name: Add remote user to docker group for non-sudo Docker commands
   ansible.builtin.user:
-    name: "{{ user_name }}"
+    name: "{{ ansible_user }}" # 'ansible_user' is the user Ansible connects as.
     groups: docker
-    append: yes
-  notify: 
-    - Restart Docker
-    - Update environment  # ← Can notify multiple handlers
+    append: true # Add to existing groups, don't replace.
+  # Note: User will need to log out and log back in for group changes to take full effect.
+
+# The tasks for pip3 and Docker SDK were in your original prompt.
+# These are kept here for consistency with your initial setup.
+- name: Install pip3 (Python package manager)
+  ansible.builtin.apt:
+    name: python3-pip
+    state: present
+
+- name: Install Docker SDK for Python via pip
+  ansible.builtin.pip:
+    name: docker
+    state: present
+
+# Verification task (optional, but good for visibility)
+- name: Verify Docker installation by checking version after tasks
+  ansible.builtin.command: docker --version
+  register: docker_version_after_run
+  changed_when: false
+  failed_when: false # Don't fail the play if this command fails, just use for debug output
+
+- name: Show Docker installation status
+  ansible.builtin.debug:
+    msg: |
+      Docker Installation Check:
+      - Initial status: {{ 'Not installed' if docker_check.rc != 0 else ('Already installed: ' + (docker_check.stdout | default('(version not captured)'))) }}
+      - Final version command output: {{ docker_version_after_run.stdout | default('Docker not detected or command failed.') }}
+
+
+#pass test
